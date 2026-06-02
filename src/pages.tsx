@@ -348,6 +348,8 @@ export const ProjectsPage = () => {
 
 export const TasksPage = () => {
   const [params, setParams] = useState({ search: "", status: "", priority: "", deadlineStatus: "", sort: "-updatedAt", page: 1 });
+  const [activeTaskId, setActiveTaskId] = useState<string>("");
+  const [commentBody, setCommentBody] = useState("");
   const [form, setForm] = useState({
     projectId: "",
     title: "",
@@ -373,6 +375,26 @@ export const TasksPage = () => {
   });
   const deleteTask = useMutation({
     mutationFn: async (id: string) => (await api.delete(`/tasks/${id}`)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+  });
+  const { data: comments } = useQuery({
+    queryKey: ["task-comments", activeTaskId],
+    queryFn: async () => (await api.get(`/collaboration/tasks/${activeTaskId}/comments`)).data,
+    enabled: Boolean(activeTaskId),
+  });
+  const addComment = useMutation({
+    mutationFn: async () => (await api.post(`/collaboration/tasks/${activeTaskId}/comments`, { body: commentBody })).data,
+    onSuccess: () => {
+      setCommentBody("");
+      qc.invalidateQueries({ queryKey: ["task-comments", activeTaskId] });
+    },
+  });
+  const uploadAttachment = useMutation({
+    mutationFn: async ({ taskId, file }: { taskId: string; file: File }) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return (await api.post(`/collaboration/tasks/${taskId}/attachments`, formData)).data;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
   });
   const totalPages = useMemo(() => Math.max(1, Math.ceil((data?.total || 0) / 10)), [data?.total]);
@@ -415,9 +437,47 @@ export const TasksPage = () => {
           <h4>{t.title} ({t.priority})</h4>
           <p>{t.description}</p>
           <p>Assigned: {t.assignedTo?.name || "N/A"} | Due: {new Date(t.dueDate).toLocaleDateString()}</p>
+          <div className="row">
+            <span className={`badge ${t.status === "Completed" ? "badge--success" : t.status === "In Progress" ? "badge--warning" : "badge--neutral"}`}>
+              {t.status}
+            </span>
+          </div>
           <select aria-label="Task status" value={t.status} onChange={(e) => changeStatus.mutate({ id: t._id, status: e.target.value })}>
             <option>Todo</option><option>In Progress</option><option>Completed</option>
           </select>
+          <div className="row">
+            <button type="button" className="btnGhost" onClick={() => setActiveTaskId((prev) => (prev === t._id ? "" : t._id))}>
+              {activeTaskId === t._id ? "Hide discussion" : "Comments & Attachments"}
+            </button>
+            <label className="btnGhost" style={{ cursor: "pointer" }}>
+              Upload file
+              <input
+                type="file"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) uploadAttachment.mutate({ taskId: t._id, file });
+                }}
+              />
+            </label>
+          </div>
+          {Array.isArray(t.attachments) && t.attachments.length > 0 ? (
+            <div className="listRow">Attachments: {t.attachments.map((a: any) => a.fileName).join(", ")}</div>
+          ) : null}
+          {activeTaskId === t._id ? (
+            <div className="panel">
+              <h3>Task Discussion</h3>
+              {(comments || []).map((c: any) => (
+                <div key={c._id} className="listRow">
+                  <strong>{c.authorId?.name || "User"}:</strong> {c.body}
+                </div>
+              ))}
+              <textarea placeholder="Write a comment..." value={commentBody} onChange={(e) => setCommentBody(e.target.value)} />
+              <button type="button" className="btnPrimary" onClick={() => addComment.mutate()} disabled={!commentBody.trim()}>
+                Add Comment
+              </button>
+            </div>
+          ) : null}
           <RoleGate roles={["Admin", "ProjectManager"]}>
             <button type="button" className="btnDanger" onClick={() => deleteTask.mutate(t._id)}>Delete</button>
           </RoleGate>
