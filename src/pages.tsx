@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { Bar, BarChart, CartesianGrid, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "./api";
 import { DEMO_ACCOUNTS, type DemoRole } from "./constants/demoUsers";
 import { Card, PageHeader, RoleGate } from "./components";
@@ -220,6 +220,7 @@ export const DashboardPage = () => {
   });
   const upcoming = (tasksData?.items || []).filter((t: any) => new Date(t.dueDate) >= new Date()).slice(0, 5);
   const highPriority = (tasksData?.items || []).filter((t: any) => t.priority === "High" && t.status !== "Completed").slice(0, 5);
+  const projectProgress = analytics?.projectProgress || [];
 
   return (
     <>
@@ -254,6 +255,18 @@ export const DashboardPage = () => {
         </ResponsiveContainer>
       </section>
       <section className="panel">
+        <h3>Project Progress Trend</h3>
+        <ResponsiveContainer width="100%" height={260}>
+          <LineChart data={projectProgress}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="projectName" />
+            <YAxis />
+            <Tooltip />
+            <Line type="monotone" dataKey="completionPercent" stroke="#4f46e5" strokeWidth={2} />
+          </LineChart>
+        </ResponsiveContainer>
+      </section>
+      <section className="panel">
         <h3>Upcoming Deadlines</h3>
         {upcoming.map((t: any) => (
           <div key={t._id} className="listRow">{t.title} — {new Date(t.dueDate).toLocaleDateString()}</div>
@@ -272,6 +285,14 @@ export const DashboardPage = () => {
         ))}
       </section>
       <section className="panel">
+        <h3>Project Summary</h3>
+        {projectProgress.slice(0, 6).map((p: any) => (
+          <div key={String(p.projectId)} className="listRow">
+            {p.projectName} — {p.pending} pending, {p.completionPercent}% completed
+          </div>
+        ))}
+      </section>
+      <section className="panel">
         <h3>Recent Activities</h3>
         {(activities || []).map((a: any) => (
           <div key={a._id} className="listRow">{new Date(a.createdAt).toLocaleTimeString()} — {a.message}</div>
@@ -285,13 +306,17 @@ export const DashboardPage = () => {
 export const ProjectsPage = () => {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [sort, setSort] = useState("-updatedAt");
+  const [page, setPage] = useState(1);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState("");
+  const [memberSelections, setMemberSelections] = useState<Record<string, string>>({});
   const qc = useQueryClient();
+  const { data: users } = useQuery({ queryKey: ["project-users"], queryFn: async () => (await api.get("/users")).data });
   const { data } = useQuery({
-    queryKey: ["projects", search, status],
-    queryFn: async () => (await api.get("/projects", { params: { search, status, sort: "-updatedAt" } })).data,
+    queryKey: ["projects", search, status, sort, page],
+    queryFn: async () => (await api.get("/projects", { params: { search, status, sort, page, limit: 8 } })).data,
   });
   const createProject = useMutation({
     mutationFn: async () =>
@@ -306,6 +331,12 @@ export const ProjectsPage = () => {
     mutationFn: async (id: string) => (await api.delete(`/projects/${id}`)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
   });
+  const addMember = useMutation({
+    mutationFn: async ({ id, memberId }: { id: string; memberId: string }) =>
+      (await api.post(`/projects/${id}/members`, { memberIds: [memberId] })).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
+  });
+  const totalPages = Math.max(1, Math.ceil((data?.total || 0) / 8));
   return (
     <>
       <PageHeader title="Projects" subtitle="Create and manage project timelines and status." />
@@ -314,6 +345,11 @@ export const ProjectsPage = () => {
         <input placeholder="Search by name" value={search} onChange={(e) => setSearch(e.target.value)} />
         <select aria-label="Filter project status" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All Status</option><option>Active</option><option>Completed</option><option>On Hold</option>
+        </select>
+        <select aria-label="Sort projects" value={sort} onChange={(e) => setSort(e.target.value)}>
+          <option value="-createdAt">Latest Created</option>
+          <option value="deadline">Nearest Deadline</option>
+          <option value="-updatedAt">Recently Updated</option>
         </select>
       </div>
       <RoleGate roles={["Admin", "ProjectManager"]}>
@@ -328,7 +364,8 @@ export const ProjectsPage = () => {
         <article key={p._id} className="item">
           <h4>{p.name}</h4>
           <p>{p.description}</p>
-          <p>Status: {p.status}</p>
+          <p>Status: {p.status} | Deadline: {new Date(p.deadline).toLocaleDateString()}</p>
+          <p>Members: {(p.members || []).map((m: any) => m.name).join(", ") || "None"}</p>
           <RoleGate roles={["Admin", "ProjectManager"]}>
             <div className="row">
               <select aria-label="Update project status" value={p.status} onChange={(e) => updateProject.mutate({ id: p._id, status: e.target.value })}>
@@ -338,18 +375,59 @@ export const ProjectsPage = () => {
               </select>
               <button type="button" className="btnDanger" onClick={() => deleteProject.mutate(p._id)}>Delete</button>
             </div>
+            <div className="row">
+              <select
+                aria-label="Add member to project"
+                value={memberSelections[p._id] || ""}
+                onChange={(e) => setMemberSelections((prev) => ({ ...prev, [p._id]: e.target.value }))}
+              >
+                <option value="">Select member</option>
+                {(users || []).map((u: any) => (
+                  <option key={u._id} value={u._id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btnGhost"
+                disabled={!memberSelections[p._id]}
+                onClick={() => addMember.mutate({ id: p._id, memberId: memberSelections[p._id] })}
+              >
+                Add Member
+              </button>
+            </div>
           </RoleGate>
         </article>
       ))}
+      <div className="pagination">
+        <button type="button" className="btnGhost" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+          Previous
+        </button>
+        <span>Page {page} of {totalPages}</span>
+        <button type="button" className="btnGhost" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+          Next
+        </button>
+      </div>
     </div>
     </>
   );
 };
 
 export const TasksPage = () => {
-  const [params, setParams] = useState({ search: "", status: "", priority: "", deadlineStatus: "", sort: "-updatedAt", page: 1 });
+  const [params, setParams] = useState({
+    search: "",
+    projectId: "",
+    assignedTo: "",
+    status: "",
+    priority: "",
+    deadlineStatus: "",
+    sort: "-updatedAt",
+    page: 1,
+  });
   const [activeTaskId, setActiveTaskId] = useState<string>("");
   const [commentBody, setCommentBody] = useState("");
+  const [editingTaskId, setEditingTaskId] = useState<string>("");
   const [form, setForm] = useState({
     projectId: "",
     title: "",
@@ -368,6 +446,24 @@ export const TasksPage = () => {
   const createTask = useMutation({
     mutationFn: async () => (await api.post("/tasks", { ...form, dueDate: new Date(form.dueDate).toISOString(), status: "Todo" })).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+  });
+  const updateTask = useMutation({
+    mutationFn: async () =>
+      (
+        await api.patch(`/tasks/${editingTaskId}`, {
+          title: form.title,
+          description: form.description,
+          assignedTo: form.assignedTo,
+          dueDate: new Date(form.dueDate).toISOString(),
+          priority: form.priority,
+          projectId: form.projectId,
+        })
+      ).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      setEditingTaskId("");
+      setForm({ projectId: "", title: "", description: "", assignedTo: "", dueDate: "", priority: "Medium" });
+    },
   });
   const changeStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => (await api.patch(`/tasks/${id}`, { status })).data,
@@ -405,6 +501,22 @@ export const TasksPage = () => {
       <div className="panel">
       <div className="toolbar">
         <input placeholder="Search title/description" value={params.search} onChange={(e) => setParams({ ...params, search: e.target.value })} />
+        <select aria-label="Filter by project" value={params.projectId} onChange={(e) => setParams({ ...params, projectId: e.target.value })}>
+          <option value="">All Projects</option>
+          {(projects?.items || []).map((p: any) => (
+            <option key={p._id} value={p._id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <select aria-label="Filter by assignee" value={params.assignedTo} onChange={(e) => setParams({ ...params, assignedTo: e.target.value })}>
+          <option value="">All Members</option>
+          {(users || []).map((u: any) => (
+            <option key={u._id} value={u._id}>
+              {u.name}
+            </option>
+          ))}
+        </select>
         <select aria-label="Filter task status" value={params.status} onChange={(e) => setParams({ ...params, status: e.target.value })}>
           <option value="">All Status</option><option>Todo</option><option>In Progress</option><option>Completed</option>
         </select>
@@ -428,8 +540,20 @@ export const TasksPage = () => {
           <select aria-label="Assign member" value={form.assignedTo} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })}>
             <option value="">Assigned member</option>{(users || []).map((u: any) => <option key={u._id} value={u._id}>{u.name}</option>)}
           </select>
+          <select aria-label="Task priority" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
           <input aria-label="Task due date" type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
-          <button type="button" className="btnPrimary" onClick={() => createTask.mutate()}>Create task</button>
+          {editingTaskId ? (
+            <>
+              <button type="button" className="btnPrimary" onClick={() => updateTask.mutate()}>Save changes</button>
+              <button type="button" className="btnGhost" onClick={() => setEditingTaskId("")}>Cancel</button>
+            </>
+          ) : (
+            <button type="button" className="btnPrimary" onClick={() => createTask.mutate()}>Create task</button>
+          )}
         </div>
       </RoleGate>
       {(data?.items || []).map((t: any) => (
@@ -449,11 +573,11 @@ export const TasksPage = () => {
             <button type="button" className="btnGhost" onClick={() => setActiveTaskId((prev) => (prev === t._id ? "" : t._id))}>
               {activeTaskId === t._id ? "Hide discussion" : "Comments & Attachments"}
             </button>
-            <label className="btnGhost" style={{ cursor: "pointer" }}>
+            <label className="btnGhost clickableLabel">
               Upload file
               <input
                 type="file"
-                style={{ display: "none" }}
+                className="fileInputHidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) uploadAttachment.mutate({ taskId: t._id, file });
@@ -479,6 +603,23 @@ export const TasksPage = () => {
             </div>
           ) : null}
           <RoleGate roles={["Admin", "ProjectManager"]}>
+            <button
+              type="button"
+              className="btnGhost"
+              onClick={() => {
+                setEditingTaskId(t._id);
+                setForm({
+                  projectId: t.projectId,
+                  title: t.title,
+                  description: t.description,
+                  assignedTo: t.assignedTo?._id || t.assignedTo,
+                  dueDate: new Date(t.dueDate).toISOString().slice(0, 10),
+                  priority: t.priority,
+                });
+              }}
+            >
+              Edit
+            </button>
             <button type="button" className="btnDanger" onClick={() => deleteTask.mutate(t._id)}>Delete</button>
           </RoleGate>
         </article>
@@ -495,6 +636,7 @@ export const TasksPage = () => {
 
 export const TeamPage = () => {
   const [memberQuery, setMemberQuery] = useState("");
+  const [selectedMemberId, setSelectedMemberId] = useState("");
   const { data: users } = useQuery({
     queryKey: ["user-search", memberQuery],
     queryFn: async () => (await api.get("/users/search", { params: { q: memberQuery } })).data,
@@ -502,6 +644,11 @@ export const TeamPage = () => {
   const { data: tasks } = useQuery({
     queryKey: ["team-tasks"],
     queryFn: async () => (await api.get("/tasks", { params: { limit: 200 } })).data,
+  });
+  const { data: memberTasks } = useQuery({
+    queryKey: ["member-task-list", selectedMemberId],
+    queryFn: async () => (await api.get("/tasks", { params: { assignedTo: selectedMemberId, limit: 50, sort: "-updatedAt" } })).data,
+    enabled: Boolean(selectedMemberId),
   });
   const workload = useMemo(() => {
     const map: Record<string, { total: number; completed: number; pending: number }> = {};
@@ -520,6 +667,14 @@ export const TeamPage = () => {
       <div className="panel">
       <div className="toolbar">
         <input placeholder="Search team members by name" value={memberQuery} onChange={(e) => setMemberQuery(e.target.value)} />
+        <select aria-label="Select member task list" value={selectedMemberId} onChange={(e) => setSelectedMemberId(e.target.value)}>
+          <option value="">Select member for task list</option>
+          {(users || []).map((u: any) => (
+            <option key={u._id} value={u._id}>
+              {u.name}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="grid">
         {(users || []).map((u: any) => (
@@ -534,6 +689,16 @@ export const TeamPage = () => {
       {workload.map(([name, stat]) => (
         <div key={name} className="listRow">{name} — {stat.total} tasks · {stat.completed} completed · {stat.pending} pending</div>
       ))}
+      {selectedMemberId ? (
+        <>
+          <h3>Member-wise Task List</h3>
+          {(memberTasks?.items || []).map((t: any) => (
+            <div key={t._id} className="listRow">
+              {t.title} — {t.status} — Due {new Date(t.dueDate).toLocaleDateString()}
+            </div>
+          ))}
+        </>
+      ) : null}
     </div>
     </>
   );

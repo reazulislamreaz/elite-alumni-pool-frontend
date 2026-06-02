@@ -177,6 +177,14 @@ button:disabled {
   font: inherit;
 }
 
+.clickableLabel {
+  cursor: pointer;
+}
+
+.fileInputHidden {
+  display: none;
+}
+
 /* App shell */
 .appShell {
   display: grid;
