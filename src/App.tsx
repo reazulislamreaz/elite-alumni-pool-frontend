@@ -1,8 +1,8 @@
-import { Link, Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { useEffect } from "react";
 import { setToken } from "./api";
-import { ProtectedRoute } from "./components";
-import { DashboardPage, LoginPage, ProjectsPage, TasksPage } from "./pages";
+import { ProtectedRoute, ShellNav, roleLabel } from "./components";
+import { DashboardPage, LoginPage, NotificationsPage, ProjectsPage, SignupPage, TasksPage, TeamPage } from "./pages";
 import { hydrateAuth, useAuthStore } from "./store";
 
 const Shell = () => {
@@ -10,27 +10,37 @@ const Shell = () => {
   const logout = useAuthStore((s) => s.logout);
   const theme = useAuthStore((s) => s.theme);
   const toggleTheme = useAuthStore((s) => s.toggleTheme);
+
   return (
-    <div className={theme}>
-      <header className="topbar">
-        <nav className="row">
-          <Link to="/">Dashboard</Link>
-          <Link to="/projects">Projects</Link>
-          <Link to="/tasks">Tasks</Link>
-        </nav>
-        <div className="row">
-          <small>
-            {user?.name} ({user?.role})
-          </small>
-          <button onClick={toggleTheme}>Theme</button>
-          <button onClick={logout}>Logout</button>
+    <div className={`appShell ${theme}`}>
+      <aside className="sidebar">
+        <div className="brand">
+          <div className="brandMark">Elite Pool</div>
+          <p className="brandTag">Project collaboration</p>
         </div>
-      </header>
-      <main className="container">
+        <ShellNav />
+        <div className="sidebarFooter">
+          <div className="userMeta">
+            <span className="userName">{user?.name}</span>
+            <span className="userRole">{roleLabel(user?.role)}</span>
+          </div>
+          <div className="sidebarActions">
+            <button type="button" className="btnGhost" onClick={toggleTheme}>
+              {theme === "light" ? "Dark mode" : "Light mode"}
+            </button>
+            <button type="button" className="btnDanger" onClick={logout}>
+              Sign out
+            </button>
+          </div>
+        </div>
+      </aside>
+      <main className="mainArea">
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/tasks" element={<TasksPage />} />
+          <Route path="/team" element={<TeamPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
         </Routes>
       </main>
     </div>
@@ -47,6 +57,7 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/*" element={<Shell />} />
       </Route>
