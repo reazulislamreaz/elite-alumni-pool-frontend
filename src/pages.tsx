@@ -4,8 +4,23 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "./api";
 import { DEMO_ACCOUNTS, type DemoRole } from "./constants/demoUsers";
-import { Card, PageHeader, RoleGate } from "./components";
+import {
+  Card,
+  CHART,
+  ChartPanel,
+  EmptyState,
+  MemberCard,
+  NotificationItem,
+  PageCard,
+  PageHeader,
+  PanelTitle,
+  RoleGate,
+  TaskProgress,
+} from "./components";
 import { useAuthStore } from "./store";
+
+const getApiError = (err: unknown) =>
+  (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Request failed";
 
 export const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -43,7 +58,7 @@ export const LoginPage = () => {
       <aside className="authHero">
         <h1 className="authHeroTitle">Manage projects with clarity.</h1>
         <p className="authHeroText">
-          Track tasks, collaborate with your team, and monitor progress from one polished workspace.
+          Track tasks, collaborate with your team, and monitor progress from one workspace.
         </p>
         <ul className="authHeroList">
           <li>Role-based access for Admin, Manager, and Members</li>
@@ -221,84 +236,135 @@ export const DashboardPage = () => {
   const upcoming = (tasksData?.items || []).filter((t: any) => new Date(t.dueDate) >= new Date()).slice(0, 5);
   const highPriority = (tasksData?.items || []).filter((t: any) => t.priority === "High" && t.status !== "Completed").slice(0, 5);
   const projectProgress = analytics?.projectProgress || [];
+  const projectSummary = analytics?.projectSummary || [];
+  const productivity = analytics?.productivity || [];
+
+  const tasksByPriority = analytics?.tasksByPriority || [];
+  const statusDist = analytics?.statusDist || [];
 
   return (
     <>
       <PageHeader title="Dashboard" subtitle="Overview of projects, tasks, and team productivity." />
-      <div className="grid">
-      <Card title="Total Projects" value={kpis?.totalProjects ?? 0} />
-      <Card title="Total Tasks" value={kpis?.totalTasks ?? 0} />
-      <Card title="Completed" value={kpis?.completedTasks ?? 0} tone="success" />
-      <Card title="Pending" value={kpis?.pendingTasks ?? 0} tone="warning" />
-      <Card title="Overdue" value={kpis?.overdueTasks ?? 0} tone="danger" />
+      <div className="kpiRow">
+        <Card title="Total Projects" value={kpis?.totalProjects ?? 0} />
+        <Card title="Total Tasks" value={kpis?.totalTasks ?? 0} />
+        <Card title="Completed" value={kpis?.completedTasks ?? 0} tone="success" />
+        <Card title="Pending" value={kpis?.pendingTasks ?? 0} tone="warning" />
+        <Card title="Overdue" value={kpis?.overdueTasks ?? 0} tone="danger" />
       </div>
-      <div className="grid gridLarge mtLg">
-      <section className="panel">
-        <h3>Tasks By Priority</h3>
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={analytics?.tasksByPriority || []}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="_id" />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="count" fill="#6366f1" />
-          </BarChart>
-        </ResponsiveContainer>
-      </section>
-      <section className="panel">
-        <h3>Task Status Distribution</h3>
-        <ResponsiveContainer width="100%" height={260}>
-          <PieChart>
-            <Pie data={analytics?.statusDist || []} dataKey="count" nameKey="_id" cx="50%" cy="50%" outerRadius={90} fill="#10b981" />
-            <Tooltip />
-          </PieChart>
-        </ResponsiveContainer>
-      </section>
-      <section className="panel">
-        <h3>Project Progress Trend</h3>
-        <ResponsiveContainer width="100%" height={260}>
-          <LineChart data={projectProgress}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="projectName" />
-            <YAxis />
-            <Tooltip />
-            <Line type="monotone" dataKey="completionPercent" stroke="#4f46e5" strokeWidth={2} />
-          </LineChart>
-        </ResponsiveContainer>
-      </section>
-      <section className="panel">
-        <h3>Upcoming Deadlines</h3>
-        {upcoming.map((t: any) => (
-          <div key={t._id} className="listRow">{t.title} — {new Date(t.dueDate).toLocaleDateString()}</div>
-        ))}
-      </section>
-      <section className="panel">
-        <h3>High Priority Tasks</h3>
-        {highPriority.map((t: any) => (
-          <div key={t._id} className="listRow">{t.title} <span className="badge badge--danger">{t.status}</span></div>
-        ))}
-      </section>
-      <section className="panel">
-        <h3>Member Workload Summary</h3>
-        {(workload || []).map((m: any) => (
-          <div key={m._id} className="listRow">Member {String(m._id).slice(-6)} — {m.total} total · {m.completed} done · {m.pending} pending</div>
-        ))}
-      </section>
-      <section className="panel">
-        <h3>Project Summary</h3>
-        {projectProgress.slice(0, 6).map((p: any) => (
-          <div key={String(p.projectId)} className="listRow">
-            {p.projectName} — {p.pending} pending, {p.completionPercent}% completed
-          </div>
-        ))}
-      </section>
-      <section className="panel">
-        <h3>Recent Activities</h3>
-        {(activities || []).map((a: any) => (
-          <div key={a._id} className="listRow">{new Date(a.createdAt).toLocaleTimeString()} — {a.message}</div>
-        ))}
-      </section>
-    </div>
+      <div className="dashboardGrid">
+        <ChartPanel title="Tasks By Priority" isEmpty={!tasksByPriority.length}>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={tasksByPriority}>
+              <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="_id" tick={{ fill: CHART.axis, fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: CHART.axis, fontSize: 12 }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb" }} />
+              <Bar dataKey="count" fill={CHART.primary} radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartPanel>
+        <ChartPanel title="Task Status Distribution" isEmpty={!statusDist.length}>
+          <ResponsiveContainer width="100%" height={240}>
+            <PieChart>
+              <Pie data={statusDist} dataKey="count" nameKey="_id" cx="50%" cy="50%" outerRadius={88} fill={CHART.accent} />
+              <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb" }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartPanel>
+        <ChartPanel title="Project Progress Trend" isEmpty={!projectProgress.length}>
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={projectProgress}>
+              <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="projectName" tick={{ fill: CHART.axis, fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: CHART.axis, fontSize: 12 }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb" }} />
+              <Line type="monotone" dataKey="completionPercent" stroke={CHART.primary} strokeWidth={2.5} dot={{ fill: CHART.primary, r: 4 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartPanel>
+        <section className="panel listPanel">
+          <PanelTitle>Upcoming Deadlines</PanelTitle>
+          {upcoming.length ? (
+            upcoming.map((t: any) => (
+              <div key={t._id} className="listRow">
+                <span className="listRowTitle">{t.title}</span>
+                <span className="listRowMeta">{new Date(t.dueDate).toLocaleDateString()}</span>
+              </div>
+            ))
+          ) : (
+            <p className="emptyState">No upcoming deadlines.</p>
+          )}
+        </section>
+        <section className="panel listPanel">
+          <PanelTitle>High Priority Tasks</PanelTitle>
+          {highPriority.length ? (
+            highPriority.map((t: any) => (
+              <div key={t._id} className="listRow listRow--between">
+                <span className="listRowTitle">{t.title}</span>
+                <span className="badge badge--danger">{t.status}</span>
+              </div>
+            ))
+          ) : (
+            <p className="emptyState">No high priority tasks.</p>
+          )}
+        </section>
+        <ChartPanel title="Team Productivity Overview" isEmpty={!productivity.length}>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={productivity}>
+              <CartesianGrid stroke={CHART.grid} strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="name" tick={{ fill: CHART.axis, fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: CHART.axis, fontSize: 12 }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb" }} />
+              <Bar dataKey="completed" stackId="a" fill={CHART.primary} name="Completed" radius={[0, 0, 0, 0]} />
+              <Bar dataKey="pending" stackId="a" fill={CHART.secondary} name="Pending" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartPanel>
+        <section className="panel listPanel">
+          <PanelTitle>Member Workload Summary</PanelTitle>
+          {(workload || []).length ? (
+            (workload || []).map((m: any) => (
+              <div key={m._id} className="workloadRow">
+                <span className="workloadName">{m.name}</span>
+                <div className="workloadStats">
+                  <span>{m.total} total</span>
+                  <span className="workloadStat--done">{m.completed} done</span>
+                  <span className="workloadStat--pending">{m.pending} pending</span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="emptyState">No workload data yet.</p>
+          )}
+        </section>
+        <section className="panel listPanel">
+          <PanelTitle>Project Summary</PanelTitle>
+          {projectSummary.slice(0, 6).map((p: any) => (
+            <div key={String(p.projectId)} className="listRow">
+              <div className="listRowTitle">{p.summaryLine}</div>
+              <small>{p.deadlineLabel}</small>
+            </div>
+          ))}
+          {!projectSummary.length ? <p className="emptyState">No project data yet.</p> : null}
+        </section>
+        <section className="panel listPanel">
+          <PanelTitle>Recent Activities</PanelTitle>
+          {(activities || []).length ? (
+            (activities || []).map((a: any) => (
+              <div key={a._id} className="listRow">
+                <span className="listRowTitle">{a.message}</span>
+                <small>
+                  {new Date(a.createdAt).toLocaleTimeString()}
+                  {a.actorId?.name ? ` · ${a.actorId.name}` : ""}
+                </small>
+              </div>
+            ))
+          ) : (
+            <p className="emptyState">No recent activity.</p>
+          )}
+        </section>
+      </div>
     </>
   );
 };
@@ -312,6 +378,9 @@ export const ProjectsPage = () => {
   const [description, setDescription] = useState("");
   const [deadline, setDeadline] = useState("");
   const [memberSelections, setMemberSelections] = useState<Record<string, string>>({});
+  const [editingProjectId, setEditingProjectId] = useState("");
+  const [editForm, setEditForm] = useState({ name: "", description: "", deadline: "", status: "Active" });
+  const [projectError, setProjectError] = useState("");
   const qc = useQueryClient();
   const { data: users } = useQuery({ queryKey: ["project-users"], queryFn: async () => (await api.get("/users")).data });
   const { data } = useQuery({
@@ -324,8 +393,13 @@ export const ProjectsPage = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
   });
   const updateProject = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => (await api.patch(`/projects/${id}`, { status })).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["projects"] }),
+    mutationFn: async ({ id, payload }: { id: string; payload: Record<string, unknown> }) =>
+      (await api.patch(`/projects/${id}`, payload)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      setEditingProjectId("");
+      setProjectError("");
+    },
   });
   const deleteProject = useMutation({
     mutationFn: async (id: string) => (await api.delete(`/projects/${id}`)).data,
@@ -340,7 +414,7 @@ export const ProjectsPage = () => {
   return (
     <>
       <PageHeader title="Projects" subtitle="Create and manage project timelines and status." />
-      <div className="panel">
+      <PageCard>
       <div className="toolbar">
         <input placeholder="Search by name" value={search} onChange={(e) => setSearch(e.target.value)} />
         <select aria-label="Filter project status" value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -357,7 +431,16 @@ export const ProjectsPage = () => {
           <input placeholder="Project name" value={name} onChange={(e) => setName(e.target.value)} />
           <input placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
           <input aria-label="Project deadline" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
-          <button type="button" className="btnPrimary" onClick={() => createProject.mutate()}>Create project</button>
+          <button
+            type="button"
+            className="btnPrimary"
+            onClick={() =>
+              createProject.mutate(undefined, { onError: (e) => setProjectError(getApiError(e)) })
+            }
+          >
+            Create project
+          </button>
+          {projectError ? <p className="errorText">{projectError}</p> : null}
         </div>
       </RoleGate>
       {(data?.items || []).map((p: any) => (
@@ -368,13 +451,55 @@ export const ProjectsPage = () => {
           <p>Members: {(p.members || []).map((m: any) => m.name).join(", ") || "None"}</p>
           <RoleGate roles={["Admin", "ProjectManager"]}>
             <div className="row">
-              <select aria-label="Update project status" value={p.status} onChange={(e) => updateProject.mutate({ id: p._id, status: e.target.value })}>
-                <option>Active</option>
-                <option>Completed</option>
-                <option>On Hold</option>
-              </select>
+              <button
+                type="button"
+                className="btnGhost"
+                onClick={() => {
+                  setEditingProjectId(p._id);
+                  setEditForm({
+                    name: p.name,
+                    description: p.description,
+                    deadline: new Date(p.deadline).toISOString().slice(0, 10),
+                    status: p.status,
+                  });
+                }}
+              >
+                Edit details
+              </button>
               <button type="button" className="btnDanger" onClick={() => deleteProject.mutate(p._id)}>Delete</button>
             </div>
+            {editingProjectId === p._id ? (
+              <div className="toolbar mtSm">
+                <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Name" />
+                <input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" />
+                <input type="date" aria-label="Edit deadline" value={editForm.deadline} onChange={(e) => setEditForm({ ...editForm, deadline: e.target.value })} />
+                <select aria-label="Edit status" value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}>
+                  <option>Active</option>
+                  <option>Completed</option>
+                  <option>On Hold</option>
+                </select>
+                <button
+                  type="button"
+                  className="btnPrimary"
+                  onClick={() =>
+                    updateProject.mutate(
+                      {
+                        id: p._id,
+                        payload: {
+                          name: editForm.name,
+                          description: editForm.description,
+                          deadline: new Date(editForm.deadline).toISOString(),
+                          status: editForm.status,
+                        },
+                      },
+                      { onError: (e) => setProjectError(getApiError(e)) }
+                    )
+                  }
+                >
+                  Save project
+                </button>
+              </div>
+            ) : null}
             <div className="row">
               <select
                 aria-label="Add member to project"
@@ -409,12 +534,13 @@ export const ProjectsPage = () => {
           Next
         </button>
       </div>
-    </div>
+    </PageCard>
     </>
   );
 };
 
 export const TasksPage = () => {
+  const currentUser = useAuthStore((s) => s.user);
   const [params, setParams] = useState({
     search: "",
     projectId: "",
@@ -428,6 +554,9 @@ export const TasksPage = () => {
   const [activeTaskId, setActiveTaskId] = useState<string>("");
   const [commentBody, setCommentBody] = useState("");
   const [editingTaskId, setEditingTaskId] = useState<string>("");
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [bulkStatus, setBulkStatus] = useState("In Progress");
+  const [taskError, setTaskError] = useState("");
   const [form, setForm] = useState({
     projectId: "",
     title: "",
@@ -493,12 +622,52 @@ export const TasksPage = () => {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
   });
+  const bulkUpdate = useMutation({
+    mutationFn: async () => (await api.patch("/tasks/bulk", { taskIds: selectedTaskIds, status: bulkStatus })).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      setSelectedTaskIds([]);
+    },
+  });
   const totalPages = useMemo(() => Math.max(1, Math.ceil((data?.total || 0) / 10)), [data?.total]);
+
+  const canUpdateTaskStatus = (task: any) => {
+    if (currentUser?.role === "Admin" || currentUser?.role === "ProjectManager") return true;
+    const assigneeId = task.assignedTo?._id || task.assignedTo;
+    return String(assigneeId) === currentUser?.id;
+  };
+
+  const toggleTaskSelect = (id: string) => {
+    setSelectedTaskIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
 
   return (
     <>
-      <PageHeader title="Tasks" subtitle="Filter, assign, and update work across projects." />
-      <div className="panel">
+      <PageHeader
+        title="Tasks"
+        subtitle={
+          currentUser?.role === "TeamMember"
+            ? "View and update status on tasks assigned to you."
+            : "Filter, assign, and update work across projects."
+        }
+      />
+      <PageCard>
+      {taskError ? <p className="errorText">{taskError}</p> : null}
+      <RoleGate roles={["Admin", "ProjectManager"]}>
+        {selectedTaskIds.length > 0 ? (
+          <div className="bulkBar">
+            <span>{selectedTaskIds.length} selected</span>
+            <select aria-label="Bulk status" value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
+              <option>Todo</option>
+              <option>In Progress</option>
+              <option>Completed</option>
+            </select>
+            <button type="button" className="btnPrimary" onClick={() => bulkUpdate.mutate()}>
+              Apply bulk status
+            </button>
+          </div>
+        ) : null}
+      </RoleGate>
       <div className="toolbar">
         <input placeholder="Search title/description" value={params.search} onChange={(e) => setParams({ ...params, search: e.target.value })} />
         <select aria-label="Filter by project" value={params.projectId} onChange={(e) => setParams({ ...params, projectId: e.target.value })}>
@@ -552,23 +721,58 @@ export const TasksPage = () => {
               <button type="button" className="btnGhost" onClick={() => setEditingTaskId("")}>Cancel</button>
             </>
           ) : (
-            <button type="button" className="btnPrimary" onClick={() => createTask.mutate()}>Create task</button>
+            <button
+              type="button"
+              className="btnPrimary"
+              onClick={() => createTask.mutate(undefined, { onError: (e) => setTaskError(getApiError(e)) })}
+            >
+              Create task
+            </button>
           )}
         </div>
       </RoleGate>
       {(data?.items || []).map((t: any) => (
         <article key={t._id} className="item">
-          <h4>{t.title} ({t.priority})</h4>
+          <div className="row">
+            <RoleGate roles={["Admin", "ProjectManager"]}>
+              <input
+                type="checkbox"
+                aria-label={`Select task ${t.title}`}
+                checked={selectedTaskIds.includes(t._id)}
+                onChange={() => toggleTaskSelect(t._id)}
+              />
+            </RoleGate>
+            <h4>{t.title} ({t.priority})</h4>
+          </div>
           <p>{t.description}</p>
-          <p>Assigned: {t.assignedTo?.name || "N/A"} | Due: {new Date(t.dueDate).toLocaleDateString()}</p>
+          <p>
+            Project: {t.projectId?.name || "N/A"} | Assigned: {t.assignedTo?.name || "N/A"} | Due:{" "}
+            {new Date(t.dueDate).toLocaleDateString()}
+          </p>
+          <TaskProgress status={t.status} />
           <div className="row">
             <span className={`badge ${t.status === "Completed" ? "badge--success" : t.status === "In Progress" ? "badge--warning" : "badge--neutral"}`}>
               {t.status}
             </span>
           </div>
-          <select aria-label="Task status" value={t.status} onChange={(e) => changeStatus.mutate({ id: t._id, status: e.target.value })}>
-            <option>Todo</option><option>In Progress</option><option>Completed</option>
-          </select>
+          {canUpdateTaskStatus(t) ? (
+            <select
+              aria-label="Task status"
+              value={t.status}
+              onChange={(e) =>
+                changeStatus.mutate(
+                  { id: t._id, status: e.target.value },
+                  { onError: (err) => setTaskError(getApiError(err)) }
+                )
+              }
+            >
+              <option>Todo</option>
+              <option>In Progress</option>
+              <option>Completed</option>
+            </select>
+          ) : (
+            <p className="emptyState">Status updates are limited to assigned members.</p>
+          )}
           <div className="row">
             <button type="button" className="btnGhost" onClick={() => setActiveTaskId((prev) => (prev === t._id ? "" : t._id))}>
               {activeTaskId === t._id ? "Hide discussion" : "Comments & Attachments"}
@@ -629,7 +833,7 @@ export const TasksPage = () => {
         <span>Page {params.page} of {totalPages}</span>
         <button type="button" className="btnGhost" disabled={params.page >= totalPages} onClick={() => setParams({ ...params, page: params.page + 1 })}>Next</button>
       </div>
-    </div>
+    </PageCard>
     </>
   );
 };
@@ -664,42 +868,62 @@ export const TeamPage = () => {
   return (
     <>
       <PageHeader title="Team" subtitle="Search members and review workload distribution." />
-      <div className="panel">
-      <div className="toolbar">
-        <input placeholder="Search team members by name" value={memberQuery} onChange={(e) => setMemberQuery(e.target.value)} />
-        <select aria-label="Select member task list" value={selectedMemberId} onChange={(e) => setSelectedMemberId(e.target.value)}>
-          <option value="">Select member for task list</option>
-          {(users || []).map((u: any) => (
-            <option key={u._id} value={u._id}>
-              {u.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="grid">
-        {(users || []).map((u: any) => (
-          <article key={u._id} className="item">
-            <h4>{u.name}</h4>
-            <p>{u.email}</p>
-            <p>{u.role}</p>
-          </article>
-        ))}
-      </div>
-      <h3>Workload Summary</h3>
-      {workload.map(([name, stat]) => (
-        <div key={name} className="listRow">{name} — {stat.total} tasks · {stat.completed} completed · {stat.pending} pending</div>
-      ))}
-      {selectedMemberId ? (
-        <>
-          <h3>Member-wise Task List</h3>
-          {(memberTasks?.items || []).map((t: any) => (
-            <div key={t._id} className="listRow">
-              {t.title} — {t.status} — Due {new Date(t.dueDate).toLocaleDateString()}
-            </div>
-          ))}
-        </>
-      ) : null}
-    </div>
+      <PageCard>
+        <div className="toolbar">
+          <input placeholder="Search team members by name" value={memberQuery} onChange={(e) => setMemberQuery(e.target.value)} />
+          <select aria-label="Select member task list" value={selectedMemberId} onChange={(e) => setSelectedMemberId(e.target.value)}>
+            <option value="">Select member for task list</option>
+            {(users || []).map((u: any) => (
+              <option key={u._id} value={u._id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        {(users || []).length ? (
+          <div className="memberGrid">
+            {(users || []).map((u: any) => (
+              <MemberCard key={u._id} name={u.name} email={u.email} role={u.role} />
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="No members found" description="Try a different search term." />
+        )}
+        <div className="sectionDivider">
+          <PanelTitle>Workload Summary</PanelTitle>
+          {workload.length ? (
+            workload.map(([name, stat]) => (
+              <div key={name} className="workloadRow">
+                <span className="workloadName">{name}</span>
+                <div className="workloadStats">
+                  <span>{stat.total} tasks</span>
+                  <span className="workloadStat--done">{stat.completed} completed</span>
+                  <span className="workloadStat--pending">{stat.pending} pending</span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="emptyState">No task assignments to summarize yet.</p>
+          )}
+        </div>
+        {selectedMemberId ? (
+          <div className="sectionDivider">
+            <PanelTitle>Member-wise Task List</PanelTitle>
+            {(memberTasks?.items || []).length ? (
+              (memberTasks?.items || []).map((t: any) => (
+                <div key={t._id} className="listRow listRow--between">
+                  <span className="listRowTitle">{t.title}</span>
+                  <span className="listRowMeta">
+                    {t.status} · Due {new Date(t.dueDate).toLocaleDateString()}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="emptyState">This member has no assigned tasks.</p>
+            )}
+          </div>
+        ) : null}
+      </PageCard>
     </>
   );
 };
@@ -714,23 +938,32 @@ export const NotificationsPage = () => {
     mutationFn: async (id: string) => (await api.patch(`/collaboration/notifications/${id}/read`)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
   });
+  const items = notifications || [];
+
   return (
     <>
       <PageHeader title="Notifications" subtitle="Stay updated on assignments and project changes." />
-      <div className="panel">
-      {(notifications || []).map((n: any) => (
-        <article key={n._id} className="item">
-          <h4>{n.title}</h4>
-          <p>{n.message}</p>
-          <p>{new Date(n.createdAt).toLocaleString()}</p>
-          {!n.isRead ? (
-            <button type="button" className="btnPrimary" onClick={() => markRead.mutate(n._id)}>Mark as read</button>
-          ) : (
-            <span className="badge badge--success">Read</span>
-          )}
-        </article>
-      ))}
-    </div>
+      <PageCard className="pageCard--flush">
+        {items.length ? (
+          <div className="notificationList">
+            {items.map((n: any) => (
+              <NotificationItem
+                key={n._id}
+                title={n.title}
+                message={n.message}
+                createdAt={n.createdAt}
+                isRead={n.isRead}
+                onMarkRead={!n.isRead ? () => markRead.mutate(n._id) : undefined}
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="You're all caught up"
+            description="New assignments and project updates will appear here."
+          />
+        )}
+      </PageCard>
     </>
   );
 };

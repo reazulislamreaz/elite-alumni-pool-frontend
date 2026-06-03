@@ -8,30 +8,29 @@ import { hydrateAuth, useAuthStore } from "./store";
 const Shell = () => {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
-  const theme = useAuthStore((s) => s.theme);
-  const toggleTheme = useAuthStore((s) => s.toggleTheme);
 
   return (
-    <div className={`appShell ${theme}`}>
+    <div className="appShell">
       <aside className="sidebar">
-        <div className="brand">
-          <div className="brandMark">Elite Pool</div>
-          <p className="brandTag">Project collaboration</p>
+        <div className="sidebarHeader">
+          <div className="brand">
+            <div className="brandLogo">EP</div>
+            <div className="brandMark">Elite Pool</div>
+          </div>
+          <div className="profileCard">
+            <div className="userAvatar">{user?.name?.charAt(0) || "U"}</div>
+            <div className="userMeta">
+              <span className="userName">{user?.name}</span>
+              <span className="userEmail">{user?.email}</span>
+              <span className="userRole">{roleLabel(user?.role)}</span>
+            </div>
+          </div>
         </div>
-        <ShellNav />
-        <div className="sidebarFooter">
-          <div className="userMeta">
-            <span className="userName">{user?.name}</span>
-            <span className="userRole">{roleLabel(user?.role)}</span>
-          </div>
-          <div className="sidebarActions">
-            <button type="button" className="btnGhost" onClick={toggleTheme}>
-              {theme === "light" ? "Dark mode" : "Light mode"}
-            </button>
-            <button type="button" className="btnDanger" onClick={logout}>
-              Sign out
-            </button>
-          </div>
+        <div className="sidebarBody">
+          <ShellNav />
+          <button type="button" className="btnSignOut" onClick={logout}>
+            Sign out
+          </button>
         </div>
       </aside>
       <main className="mainArea">
