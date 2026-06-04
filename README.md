@@ -1,73 +1,80 @@
-# React + TypeScript + Vite
+# TaskForge — Smart Project & Task Collaboration System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A full-stack MERN application for managing projects, tasks, team members, and
+work progress — with role-based access control, business-rule validation, and
+analytics. **This repository is the frontend (React + Vite SPA).**
 
-Currently, two official plugins are available:
+## 🔗 Live & Source
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+| | |
+|---|---|
+| **Live App** | https://elite-alumni-pool-frontend.vercel.app |
+| **Live API** | https://elite-alumni-pool-backend.vercel.app |
+| **Frontend repo** | https://github.com/reazulislamreaz/elite-alumni-pool-frontend |
+| **Backend repo** | https://github.com/reazulislamreaz/elite-alumni-pool-backend |
 
-## React Compiler
+## 🔑 Demo Credentials
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+One-click demo cards are on the login page. Password for all demo accounts: **`Demo@123456`**
 
-## Expanding the ESLint configuration
+| Role | Email |
+|------|-------|
+| Admin | `admin@demo.elitepool.com` |
+| Project Manager | `manager@demo.elitepool.com` |
+| Team Member | `member@demo.elitepool.com` |
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+> Public signup always creates a **Team Member**; use a demo login to explore
+> Admin or Manager access.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## ✨ Features
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- **Auth & RBAC** — email/password, JWT, demo login, three roles (Admin, Project Manager, Team Member)
+- **Projects** — full CRUD, status (Active / Completed / On Hold), deadline, member management
+- **Tasks** — CRUD, assignee (project members only), priority, status, quick status change, bulk actions, progress bars
+- **Validation** — duplicate-title, completed-task reassignment, and past-deadline messages
+- **Team** — add members, member-wise task lists, workload summary (total / completed / pending)
+- **Dashboard** — KPI cards + charts (Tasks by Priority, Status Distribution, Project Progress, Team Productivity), recent activity, upcoming deadlines, high-priority tasks, workload
+- **Activity log**, **comments**, **file attachments**, **notifications**
+- **Search / filter / sort / pagination**
+- **Dark & light mode** (persisted, follows OS), **skeleton loaders**, fully **responsive** with a mobile drawer
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🛠 Tech Stack
+
+- **Frontend:** React 19, Vite, TypeScript, React Query, Zustand, React Router, Recharts
+- **Backend:** Node.js, Express, TypeScript, Mongoose, Zod, JWT (separate repo)
+- **Database:** MongoDB (Atlas)
+
+## 🚀 Setup
+
+```bash
+cp .env.example .env      # set VITE_API_URL
+npm install
+npm run dev               # http://localhost:5173
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Scripts: `npm run dev` · `npm run build` · `npm run preview` · `npm run lint`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 🔐 Environment Variables (`.env`)
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Key | Description |
+|-----|-------------|
+| `VITE_API_URL` | Base URL of the backend API, e.g. `http://localhost:5000/api` (local) or `https://elite-alumni-pool-backend.vercel.app/api` (prod) |
+
+## 👤 Role Permissions
+
+- **Admin** — full access
+- **Project Manager** — create/manage projects, assign tasks, add members
+- **Team Member** — update status on tasks assigned to them only
+
+## ☁️ Deployment (Vercel)
+
+1. Import this repo into Vercel (framework preset: **Vite**; build `npm run build`, output `dist`).
+2. Set `VITE_API_URL` to the deployed API base, e.g. `https://elite-alumni-pool-backend.vercel.app/api`.
+3. `vercel.json` provides the SPA fallback rewrite so client-side routes work on refresh.
+4. After deploy, set the backend's `CLIENT_URL` to this app's URL (CORS).
+
+## 🧪 Build
+
+```bash
+npm run build
 ```
