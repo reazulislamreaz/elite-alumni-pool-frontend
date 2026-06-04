@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -21,6 +21,65 @@ import { useAuthStore } from "./store";
 
 const getApiError = (err: unknown) =>
   (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Request failed";
+
+const projectStatusVariant = (s: string) => (s === "Active" ? "success" : s === "On Hold" ? "warning" : "neutral");
+const taskStatusVariant = (s: string) => (s === "Completed" ? "success" : s === "In Progress" ? "warning" : "neutral");
+const priorityVariant = (p: string) => (p === "High" ? "danger" : p === "Medium" ? "warning" : "neutral");
+
+const initialsOf = (name?: string) =>
+  (name || "?")
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+const isOverdue = (dueDate: string, status?: string) => status !== "Completed" && new Date(dueDate) < new Date();
+
+const formatDate = (d: string) =>
+  new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+
+const ICON_PATHS: Record<string, ReactNode> = {
+  calendar: (
+    <>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </>
+  ),
+  users: (
+    <>
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+    </>
+  ),
+  folder: <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />,
+  user: (
+    <>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6v6l4 2" />
+    </>
+  ),
+};
+
+const Icon = ({ name }: { name: keyof typeof ICON_PATHS }) => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    {ICON_PATHS[name]}
+  </svg>
+);
+
+const AvatarChip = ({ name }: { name: string }) => (
+  <span className="avatarChip">
+    <span className="avatarChipDot">{initialsOf(name)}</span>
+    {name}
+  </span>
+);
 
 export const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -423,104 +482,135 @@ export const ProjectsPage = () => {
         </select>
       </div>
       <RoleGate roles={["Admin", "ProjectManager"]}>
-        <div className="toolbar mtSm">
-          <input placeholder="Project name" value={name} onChange={(e) => setName(e.target.value)} />
-          <input placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
-          <input aria-label="Project deadline" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
-          <button
-            type="button"
-            className="btnPrimary"
-            onClick={() =>
-              createProject.mutate(undefined, { onError: (e) => setProjectError(getApiError(e)) })
-            }
-          >
-            Create project
-          </button>
+        <div className="createPanel">
+          <h3 className="createPanelTitle">Create a project</h3>
+          <div className="createGrid">
+            <input placeholder="Project name" value={name} onChange={(e) => setName(e.target.value)} />
+            <input placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
+            <input aria-label="Project deadline" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+            <button
+              type="button"
+              className="btnPrimary"
+              onClick={() => createProject.mutate(undefined, { onError: (e) => setProjectError(getApiError(e)) })}
+            >
+              Create project
+            </button>
+          </div>
           {projectError ? <p className="errorText">{projectError}</p> : null}
         </div>
       </RoleGate>
-      {(data?.items || []).map((p: any) => (
-        <article key={p._id} className="item">
-          <h4>{p.name}</h4>
-          <p>{p.description}</p>
-          <p>Status: {p.status} | Deadline: {new Date(p.deadline).toLocaleDateString()}</p>
-          <p>Members: {(p.members || []).map((m: any) => m.name).join(", ") || "None"}</p>
-          <RoleGate roles={["Admin", "ProjectManager"]}>
-            <div className="row">
-              <button
-                type="button"
-                className="btnGhost"
-                onClick={() => {
-                  setEditingProjectId(p._id);
-                  setEditForm({
-                    name: p.name,
-                    description: p.description,
-                    deadline: new Date(p.deadline).toISOString().slice(0, 10),
-                    status: p.status,
-                  });
-                }}
-              >
-                Edit details
-              </button>
-              <button type="button" className="btnDanger" onClick={() => deleteProject.mutate(p._id)}>Delete</button>
-            </div>
-            {editingProjectId === p._id ? (
-              <div className="toolbar mtSm">
-                <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Name" />
-                <input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" />
-                <input type="date" aria-label="Edit deadline" value={editForm.deadline} onChange={(e) => setEditForm({ ...editForm, deadline: e.target.value })} />
-                <select aria-label="Edit status" value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}>
-                  <option>Active</option>
-                  <option>Completed</option>
-                  <option>On Hold</option>
-                </select>
-                <button
-                  type="button"
-                  className="btnPrimary"
-                  onClick={() =>
-                    updateProject.mutate(
-                      {
-                        id: p._id,
-                        payload: {
-                          name: editForm.name,
-                          description: editForm.description,
-                          deadline: new Date(editForm.deadline).toISOString(),
-                          status: editForm.status,
-                        },
-                      },
-                      { onError: (e) => setProjectError(getApiError(e)) }
-                    )
-                  }
-                >
-                  Save project
-                </button>
+      {(data?.items || []).length === 0 ? (
+        <EmptyState title="No projects yet" description="Projects you create or belong to will appear here." />
+      ) : null}
+      <div className="entityList">
+        {(data?.items || []).map((p: any) => {
+          const overdue = isOverdue(p.deadline, p.status === "Completed" ? "Completed" : undefined);
+          const members = p.members || [];
+          return (
+            <article key={p._id} className="entityCard">
+              <div className="entityCardHead">
+                <div className="entityCardHeadMain">
+                  <h4 className="entityCardTitle">{p.name}</h4>
+                  {p.description ? <p className="entityCardDesc">{p.description}</p> : null}
+                </div>
+                <span className={`badge badge--${projectStatusVariant(p.status)}`}>{p.status}</span>
               </div>
-            ) : null}
-            <div className="row">
-              <select
-                aria-label="Add member to project"
-                value={memberSelections[p._id] || ""}
-                onChange={(e) => setMemberSelections((prev) => ({ ...prev, [p._id]: e.target.value }))}
-              >
-                <option value="">Select member</option>
-                {(users || []).map((u: any) => (
-                  <option key={u._id} value={u._id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className="btnGhost"
-                disabled={!memberSelections[p._id]}
-                onClick={() => addMember.mutate({ id: p._id, memberId: memberSelections[p._id] })}
-              >
-                Add Member
-              </button>
-            </div>
-          </RoleGate>
-        </article>
-      ))}
+              <div className="entityMeta">
+                <span className={`metaItem${overdue ? " metaItem--overdue" : ""}`}>
+                  <Icon name="calendar" /> Due <strong>{formatDate(p.deadline)}</strong>
+                </span>
+                <span className="metaItem">
+                  <Icon name="users" /> <strong>{members.length}</strong> member{members.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              {members.length ? (
+                <div className="memberStack">
+                  {members.slice(0, 6).map((m: any) => (
+                    <AvatarChip key={m._id} name={m.name} />
+                  ))}
+                  {members.length > 6 ? <span className="avatarChip avatarChip--more">+{members.length - 6}</span> : null}
+                </div>
+              ) : null}
+              <RoleGate roles={["Admin", "ProjectManager"]}>
+                <div className="cardActions">
+                  <button
+                    type="button"
+                    className="btnGhost btnSm"
+                    onClick={() => {
+                      setEditingProjectId(editingProjectId === p._id ? "" : p._id);
+                      setEditForm({
+                        name: p.name,
+                        description: p.description,
+                        deadline: new Date(p.deadline).toISOString().slice(0, 10),
+                        status: p.status,
+                      });
+                    }}
+                  >
+                    {editingProjectId === p._id ? "Close" : "Edit details"}
+                  </button>
+                  <button type="button" className="btnDanger btnSm" onClick={() => deleteProject.mutate(p._id)}>
+                    Delete
+                  </button>
+                  <span className="cardActionsSpacer" />
+                  <select
+                    className="inlineSelect"
+                    aria-label="Add member to project"
+                    value={memberSelections[p._id] || ""}
+                    onChange={(e) => setMemberSelections((prev) => ({ ...prev, [p._id]: e.target.value }))}
+                  >
+                    <option value="">Add member…</option>
+                    {(users || []).map((u: any) => (
+                      <option key={u._id} value={u._id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="btnGhost btnSm"
+                    disabled={!memberSelections[p._id]}
+                    onClick={() => addMember.mutate({ id: p._id, memberId: memberSelections[p._id] })}
+                  >
+                    Add
+                  </button>
+                </div>
+                {editingProjectId === p._id ? (
+                  <div className="inlineForm">
+                    <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Name" />
+                    <input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" />
+                    <input type="date" aria-label="Edit deadline" value={editForm.deadline} onChange={(e) => setEditForm({ ...editForm, deadline: e.target.value })} />
+                    <select aria-label="Edit status" value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}>
+                      <option>Active</option>
+                      <option>Completed</option>
+                      <option>On Hold</option>
+                    </select>
+                    <button
+                      type="button"
+                      className="btnPrimary"
+                      onClick={() =>
+                        updateProject.mutate(
+                          {
+                            id: p._id,
+                            payload: {
+                              name: editForm.name,
+                              description: editForm.description,
+                              deadline: new Date(editForm.deadline).toISOString(),
+                              status: editForm.status,
+                            },
+                          },
+                          { onError: (e) => setProjectError(getApiError(e)) }
+                        )
+                      }
+                    >
+                      Save project
+                    </button>
+                  </div>
+                ) : null}
+              </RoleGate>
+            </article>
+          );
+        })}
+      </div>
       <div className="pagination">
         <button type="button" className="btnGhost" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
           Previous
@@ -704,139 +794,174 @@ export const TasksPage = () => {
         </select>
       </div>
       <RoleGate roles={["Admin", "ProjectManager"]}>
-        <div className="toolbar">
-          <select
-            aria-label="Project for task"
-            value={form.projectId}
-            onChange={(e) => setForm({ ...form, projectId: e.target.value, assignedTo: "" })}
-          >
-            <option value="">Project</option>{(projects?.items || []).map((p: any) => <option key={p._id} value={p._id}>{p.name}</option>)}
-          </select>
-          <input placeholder="Task title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-          <input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          <select aria-label="Assign member" value={form.assignedTo} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })} disabled={!form.projectId}>
-            <option value="">{form.projectId ? "Assigned member" : "Select a project first"}</option>
-            {assignableMembers.map((u: any) => <option key={u._id} value={u._id}>{u.name}</option>)}
-          </select>
-          <select aria-label="Task priority" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-          </select>
-          <input aria-label="Task due date" type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
-          {editingTaskId ? (
-            <>
-              <button type="button" className="btnPrimary" onClick={() => updateTask.mutate()}>Save changes</button>
-              <button type="button" className="btnGhost" onClick={() => setEditingTaskId("")}>Cancel</button>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="btnPrimary"
-              onClick={() => createTask.mutate(undefined, { onError: (e) => setTaskError(getApiError(e)) })}
+        <div className="createPanel">
+          <h3 className="createPanelTitle">{editingTaskId ? "Edit task" : "Create a task"}</h3>
+          <div className="createGrid createGrid--task">
+            <select
+              aria-label="Project for task"
+              value={form.projectId}
+              onChange={(e) => setForm({ ...form, projectId: e.target.value, assignedTo: "" })}
             >
-              Create task
-            </button>
-          )}
+              <option value="">Project</option>{(projects?.items || []).map((p: any) => <option key={p._id} value={p._id}>{p.name}</option>)}
+            </select>
+            <input placeholder="Task title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            <input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            <select aria-label="Assign member" value={form.assignedTo} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })} disabled={!form.projectId}>
+              <option value="">{form.projectId ? "Assigned member" : "Select a project first"}</option>
+              {assignableMembers.map((u: any) => <option key={u._id} value={u._id}>{u.name}</option>)}
+            </select>
+            <select aria-label="Task priority" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+            <input aria-label="Task due date" type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
+            {editingTaskId ? (
+              <>
+                <button type="button" className="btnPrimary" onClick={() => updateTask.mutate(undefined, { onError: (e) => setTaskError(getApiError(e)) })}>Save changes</button>
+                <button type="button" className="btnGhost" onClick={() => { setEditingTaskId(""); setForm({ projectId: "", title: "", description: "", assignedTo: "", dueDate: "", priority: "Medium" }); }}>Cancel</button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="btnPrimary"
+                onClick={() => createTask.mutate(undefined, { onError: (e) => setTaskError(getApiError(e)) })}
+              >
+                Create task
+              </button>
+            )}
+          </div>
         </div>
       </RoleGate>
-      {(data?.items || []).map((t: any) => (
-        <article key={t._id} className="item">
-          <div className="row">
-            <RoleGate roles={["Admin", "ProjectManager"]}>
-              <input
-                type="checkbox"
-                aria-label={`Select task ${t.title}`}
-                checked={selectedTaskIds.includes(t._id)}
-                onChange={() => toggleTaskSelect(t._id)}
-              />
-            </RoleGate>
-            <h4>{t.title} ({t.priority})</h4>
-          </div>
-          <p>{t.description}</p>
-          <p>
-            Project: {t.projectId?.name || "N/A"} | Assigned: {t.assignedTo?.name || "N/A"} | Due:{" "}
-            {new Date(t.dueDate).toLocaleDateString()}
-          </p>
-          <TaskProgress status={t.status} />
-          <div className="row">
-            <span className={`badge ${t.status === "Completed" ? "badge--success" : t.status === "In Progress" ? "badge--warning" : "badge--neutral"}`}>
-              {t.status}
-            </span>
-          </div>
-          {canUpdateTaskStatus(t) ? (
-            <select
-              aria-label="Task status"
-              value={t.status}
-              onChange={(e) =>
-                changeStatus.mutate(
-                  { id: t._id, status: e.target.value },
-                  { onError: (err) => setTaskError(getApiError(err)) }
-                )
-              }
-            >
-              <option>Todo</option>
-              <option>In Progress</option>
-              <option>Completed</option>
-            </select>
-          ) : (
-            <p className="emptyState">Status updates are limited to assigned members.</p>
-          )}
-          <div className="row">
-            <button type="button" className="btnGhost" onClick={() => setActiveTaskId((prev) => (prev === t._id ? "" : t._id))}>
-              {activeTaskId === t._id ? "Hide discussion" : "Comments & Attachments"}
-            </button>
-            <label className="btnGhost clickableLabel">
-              Upload file
-              <input
-                type="file"
-                className="fileInputHidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) uploadAttachment.mutate({ taskId: t._id, file });
-                }}
-              />
-            </label>
-          </div>
-          {Array.isArray(t.attachments) && t.attachments.length > 0 ? (
-            <div className="listRow">Attachments: {t.attachments.map((a: any) => a.fileName).join(", ")}</div>
-          ) : null}
-          {activeTaskId === t._id ? (
-            <div className="panel">
-              <h3>Task Discussion</h3>
-              {(comments || []).map((c: any) => (
-                <div key={c._id} className="listRow">
-                  <strong>{c.authorId?.name || "User"}:</strong> {c.body}
+      {(data?.items || []).length === 0 ? (
+        <EmptyState title="No tasks found" description="Adjust your filters, or create a task to get started." />
+      ) : null}
+      <div className="entityList">
+        {(data?.items || []).map((t: any) => {
+          const overdue = isOverdue(t.dueDate, t.status);
+          const isSelected = selectedTaskIds.includes(t._id);
+          return (
+            <article key={t._id} className={`entityCard taskCard taskCard--${priorityVariant(t.priority)}${isSelected ? " taskCard--selected" : ""}`}>
+              <div className="entityCardHead">
+                <div className="entityCardHeadMain">
+                  <h4 className="entityCardTitle">
+                    <RoleGate roles={["Admin", "ProjectManager"]}>
+                      <input
+                        type="checkbox"
+                        className="taskCheckbox"
+                        aria-label={`Select task ${t.title}`}
+                        checked={isSelected}
+                        onChange={() => toggleTaskSelect(t._id)}
+                      />
+                    </RoleGate>
+                    {t.title}
+                  </h4>
+                  {t.description ? <p className="entityCardDesc">{t.description}</p> : null}
                 </div>
-              ))}
-              <textarea placeholder="Write a comment..." value={commentBody} onChange={(e) => setCommentBody(e.target.value)} />
-              <button type="button" className="btnPrimary" onClick={() => addComment.mutate()} disabled={!commentBody.trim()}>
-                Add Comment
-              </button>
-            </div>
-          ) : null}
-          <RoleGate roles={["Admin", "ProjectManager"]}>
-            <button
-              type="button"
-              className="btnGhost"
-              onClick={() => {
-                setEditingTaskId(t._id);
-                setForm({
-                  projectId: t.projectId?._id || t.projectId,
-                  title: t.title,
-                  description: t.description,
-                  assignedTo: t.assignedTo?._id || t.assignedTo,
-                  dueDate: new Date(t.dueDate).toISOString().slice(0, 10),
-                  priority: t.priority,
-                });
-              }}
-            >
-              Edit
-            </button>
-            <button type="button" className="btnDanger" onClick={() => deleteTask.mutate(t._id)}>Delete</button>
-          </RoleGate>
-        </article>
-      ))}
+                <div className="badgeStack">
+                  <span className={`badge badge--${priorityVariant(t.priority)}`}>{t.priority}</span>
+                  <span className={`badge badge--${taskStatusVariant(t.status)}`}>{t.status}</span>
+                </div>
+              </div>
+              <div className="entityMeta">
+                <span className="metaItem">
+                  <Icon name="folder" /> {t.projectId?.name || "N/A"}
+                </span>
+                <span className="metaItem">
+                  <Icon name="user" /> {t.assignedTo?.name || "Unassigned"}
+                </span>
+                <span className={`metaItem${overdue ? " metaItem--overdue" : ""}`}>
+                  <Icon name="calendar" /> Due <strong>{formatDate(t.dueDate)}</strong>
+                  {overdue ? " · Overdue" : ""}
+                </span>
+              </div>
+              <TaskProgress status={t.status} />
+              <div className="cardActions">
+                {canUpdateTaskStatus(t) ? (
+                  <select
+                    className="inlineSelect statusSelect"
+                    aria-label="Task status"
+                    value={t.status}
+                    onChange={(e) =>
+                      changeStatus.mutate({ id: t._id, status: e.target.value }, { onError: (err) => setTaskError(getApiError(err)) })
+                    }
+                  >
+                    <option>Todo</option>
+                    <option>In Progress</option>
+                    <option>Completed</option>
+                  </select>
+                ) : (
+                  <span className="metaItem metaItem--muted">Status editable by the assignee only</span>
+                )}
+                <span className="cardActionsSpacer" />
+                <button type="button" className="btnGhost btnSm" onClick={() => setActiveTaskId((prev) => (prev === t._id ? "" : t._id))}>
+                  {activeTaskId === t._id ? "Hide" : "Discuss"}
+                </button>
+                <label className="btnGhost btnSm clickableLabel">
+                  Upload
+                  <input
+                    type="file"
+                    className="fileInputHidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) uploadAttachment.mutate({ taskId: t._id, file });
+                    }}
+                  />
+                </label>
+                <RoleGate roles={["Admin", "ProjectManager"]}>
+                  <button
+                    type="button"
+                    className="btnGhost btnSm"
+                    onClick={() => {
+                      setEditingTaskId(t._id);
+                      setForm({
+                        projectId: t.projectId?._id || t.projectId,
+                        title: t.title,
+                        description: t.description,
+                        assignedTo: t.assignedTo?._id || t.assignedTo,
+                        dueDate: new Date(t.dueDate).toISOString().slice(0, 10),
+                        priority: t.priority,
+                      });
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button type="button" className="btnDanger btnSm" onClick={() => deleteTask.mutate(t._id)}>Delete</button>
+                </RoleGate>
+              </div>
+              {Array.isArray(t.attachments) && t.attachments.length > 0 ? (
+                <div className="attachmentRow">
+                  {t.attachments.map((a: any, i: number) => (
+                    <span key={i} className="attachmentChip">📎 {a.fileName}</span>
+                  ))}
+                </div>
+              ) : null}
+              {activeTaskId === t._id ? (
+                <div className="discussionPanel">
+                  <h5 className="discussionTitle">Discussion</h5>
+                  {(comments || []).length ? (
+                    (comments || []).map((c: any) => (
+                      <div key={c._id} className="commentRow">
+                        <span className="avatarChipDot commentAvatar">{initialsOf(c.authorId?.name)}</span>
+                        <div>
+                          <span className="commentAuthor">{c.authorId?.name || "User"}</span>
+                          <p className="commentBody">{c.body}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="emptyState">No comments yet — start the conversation.</p>
+                  )}
+                  <textarea placeholder="Write a comment..." value={commentBody} onChange={(e) => setCommentBody(e.target.value)} />
+                  <button type="button" className="btnPrimary btnSm" onClick={() => addComment.mutate()} disabled={!commentBody.trim()}>
+                    Add Comment
+                  </button>
+                </div>
+              ) : null}
+            </article>
+          );
+        })}
+      </div>
       <div className="pagination">
         <button type="button" className="btnGhost" disabled={params.page <= 1} onClick={() => setParams({ ...params, page: params.page - 1 })}>Previous</button>
         <span>Page {params.page} of {totalPages}</span>
