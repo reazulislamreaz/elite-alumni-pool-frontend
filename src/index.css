@@ -44,6 +44,32 @@
   --space-8: 2rem;
 }
 
+/* Dark theme — only the surface/text/border tokens are overridden; the teal
+   brand palette is kept so accents stay consistent across both modes. */
+:root[data-theme="dark"] {
+  --bg: #0f1715;
+  --bg-elevated: #16201d;
+  --bg-muted: #1b2623;
+  --border: #2a3633;
+  --border-strong: #3a4844;
+
+  --text: #e6edeb;
+  --text-muted: #9fb0ab;
+  --text-soft: #6f817c;
+
+  --primary-soft: #10302b;
+  --primary-muted: #1d4a42;
+
+  --success-soft: #10302b;
+  --warning-soft: #2e2410;
+  --danger-soft: #34191a;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+
+  color-scheme: dark;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -154,9 +180,26 @@ button:disabled {
   background: #991b1b;
 }
 
-.btnSignOut {
+.themeToggle {
   width: 100%;
   margin-top: auto;
+  margin-bottom: var(--space-2);
+  padding: 0.55rem;
+  background: var(--bg-muted);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  font-size: 0.8125rem;
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+.themeToggle:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: var(--primary-muted);
+}
+
+.btnSignOut {
+  width: 100%;
   padding: 0.55rem;
   background: var(--bg-muted);
   color: var(--text-muted);
@@ -258,6 +301,13 @@ button:disabled {
   letter-spacing: -0.02em;
 }
 
+.brandTag {
+  margin-top: 2px;
+  font-size: 0.6875rem;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 400;
+}
+
 .profileCard {
   display: flex;
   align-items: center;
@@ -265,6 +315,7 @@ button:disabled {
   padding: var(--space-3);
   border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.15);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
 }
 

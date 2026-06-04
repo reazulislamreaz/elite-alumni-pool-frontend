@@ -149,14 +149,15 @@ export const SignupPage = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("TeamMember");
   const setAuth = useAuthStore((s) => s.setAuth);
   const token = useAuthStore((s) => s.token);
   const navigate = useNavigate();
 
   const signup = useMutation({
     mutationFn: async () => {
-      const { data } = await api.post("/auth/signup", { name, email, password, role });
+      // New accounts are always Team Members — Admin/Manager are assigned
+      // internally, so the role isn't user-selectable at signup.
+      const { data } = await api.post("/auth/signup", { name, email, password });
       return data;
     },
     onSuccess: (data) => {
@@ -183,7 +184,7 @@ export const SignupPage = () => {
           }}
         >
           <h2 className="authTitle">Create account</h2>
-          <p className="authSubtitle">Set up your profile and choose a role.</p>
+          <p className="authSubtitle">Set up your profile to get started.</p>
           <div className="field">
             <label htmlFor="signup-name">Full name</label>
             <input id="signup-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe" />
@@ -196,14 +197,9 @@ export const SignupPage = () => {
             <label htmlFor="signup-password">Password</label>
             <input id="signup-password" value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Min. 6 characters" />
           </div>
-          <div className="field">
-            <label htmlFor="signup-role">Role</label>
-            <select id="signup-role" aria-label="Role" value={role} onChange={(e) => setRole(e.target.value)}>
-              <option value="Admin">Admin</option>
-              <option value="ProjectManager">Project Manager</option>
-              <option value="TeamMember">Team Member</option>
-            </select>
-          </div>
+          <p className="authSubtitle">
+            New accounts join as <strong>Team Members</strong>. Use a demo login to explore Admin or Manager access.
+          </p>
           {error ? <p className="errorText">{error}</p> : null}
           <button type="submit" className="btnPrimary">Create account</button>
           <p className="authSubtitle">
@@ -567,7 +563,10 @@ export const TasksPage = () => {
   });
   const qc = useQueryClient();
   const { data: users } = useQuery({ queryKey: ["users"], queryFn: async () => (await api.get("/users")).data });
-  const { data: projects } = useQuery({ queryKey: ["project-select"], queryFn: async () => (await api.get("/projects")).data });
+  const { data: projects } = useQuery({
+    queryKey: ["project-select"],
+    queryFn: async () => (await api.get("/projects", { params: { limit: 100 } })).data,
+  });
   const { data } = useQuery({
     queryKey: ["tasks", params],
     queryFn: async () => (await api.get("/tasks", { params: { ...params, limit: 10 } })).data,
@@ -630,6 +629,11 @@ export const TasksPage = () => {
     },
   });
   const totalPages = useMemo(() => Math.max(1, Math.ceil((data?.total || 0) / 10)), [data?.total]);
+
+  // Tasks can only be assigned to members of the chosen project, so the
+  // assignee dropdown is scoped to that project's members.
+  const selectedProject = (projects?.items || []).find((p: any) => p._id === form.projectId);
+  const assignableMembers = selectedProject?.members || [];
 
   const canUpdateTaskStatus = (task: any) => {
     if (currentUser?.role === "Admin" || currentUser?.role === "ProjectManager") return true;
@@ -701,13 +705,18 @@ export const TasksPage = () => {
       </div>
       <RoleGate roles={["Admin", "ProjectManager"]}>
         <div className="toolbar">
-          <select aria-label="Project for task" value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })}>
+          <select
+            aria-label="Project for task"
+            value={form.projectId}
+            onChange={(e) => setForm({ ...form, projectId: e.target.value, assignedTo: "" })}
+          >
             <option value="">Project</option>{(projects?.items || []).map((p: any) => <option key={p._id} value={p._id}>{p.name}</option>)}
           </select>
           <input placeholder="Task title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           <input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          <select aria-label="Assign member" value={form.assignedTo} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })}>
-            <option value="">Assigned member</option>{(users || []).map((u: any) => <option key={u._id} value={u._id}>{u.name}</option>)}
+          <select aria-label="Assign member" value={form.assignedTo} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })} disabled={!form.projectId}>
+            <option value="">{form.projectId ? "Assigned member" : "Select a project first"}</option>
+            {assignableMembers.map((u: any) => <option key={u._id} value={u._id}>{u.name}</option>)}
           </select>
           <select aria-label="Task priority" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
             <option value="High">High</option>
@@ -813,7 +822,7 @@ export const TasksPage = () => {
               onClick={() => {
                 setEditingTaskId(t._id);
                 setForm({
-                  projectId: t.projectId,
+                  projectId: t.projectId?._id || t.projectId,
                   title: t.title,
                   description: t.description,
                   assignedTo: t.assignedTo?._id || t.assignedTo,

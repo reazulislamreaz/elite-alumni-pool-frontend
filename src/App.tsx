@@ -3,7 +3,24 @@ import { useEffect } from "react";
 import { setToken } from "./api";
 import { ProtectedRoute, ShellNav, roleLabel } from "./components";
 import { DashboardPage, LoginPage, NotificationsPage, ProjectsPage, SignupPage, TasksPage, TeamPage } from "./pages";
-import { hydrateAuth, useAuthStore } from "./store";
+import { hydrateAuth, useAuthStore, useThemeStore } from "./store";
+
+const ThemeToggle = () => {
+  const theme = useThemeStore((s) => s.theme);
+  const toggleTheme = useThemeStore((s) => s.toggleTheme);
+  const isDark = theme === "dark";
+  return (
+    <button
+      type="button"
+      className="btnGhost themeToggle"
+      onClick={toggleTheme}
+      aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
+      title={`Switch to ${isDark ? "light" : "dark"} mode`}
+    >
+      {isDark ? "☀️ Light mode" : "🌙 Dark mode"}
+    </button>
+  );
+};
 
 const Shell = () => {
   const user = useAuthStore((s) => s.user);
@@ -14,8 +31,11 @@ const Shell = () => {
       <aside className="sidebar">
         <div className="sidebarHeader">
           <div className="brand">
-            <div className="brandLogo">EP</div>
-            <div className="brandMark">Elite Pool</div>
+            <div className="brandLogo">TF</div>
+            <div>
+              <div className="brandMark">TaskForge</div>
+              <p className="brandTag">Project &amp; task collaboration</p>
+            </div>
           </div>
           <div className="profileCard">
             <div className="userAvatar">{user?.name?.charAt(0) || "U"}</div>
@@ -28,6 +48,7 @@ const Shell = () => {
         </div>
         <div className="sidebarBody">
           <ShellNav />
+          <ThemeToggle />
           <button type="button" className="btnSignOut" onClick={logout}>
             Sign out
           </button>
