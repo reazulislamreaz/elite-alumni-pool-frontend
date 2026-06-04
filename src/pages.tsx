@@ -15,6 +15,11 @@ import {
   PageHeader,
   PanelTitle,
   RoleGate,
+  SkeletonCards,
+  SkeletonKpis,
+  SkeletonList,
+  SkeletonMembers,
+  SkeletonPanels,
   TaskProgress,
 } from "./components";
 import { useAuthStore } from "./store";
@@ -271,8 +276,8 @@ export const SignupPage = () => {
 };
 
 export const DashboardPage = () => {
-  const { data: kpis } = useQuery({ queryKey: ["kpis"], queryFn: async () => (await api.get("/dashboard/kpis")).data });
-  const { data: analytics } = useQuery({
+  const { data: kpis, isLoading: kpisLoading } = useQuery({ queryKey: ["kpis"], queryFn: async () => (await api.get("/dashboard/kpis")).data });
+  const { data: analytics, isLoading: analyticsLoading } = useQuery({
     queryKey: ["analytics"],
     queryFn: async () => (await api.get("/dashboard/analytics")).data,
   });
@@ -300,14 +305,19 @@ export const DashboardPage = () => {
   return (
     <>
       <PageHeader title="Dashboard" subtitle="Overview of projects, tasks, and team productivity." />
-      <div className="kpiRow">
-        <Card title="Total Projects" value={kpis?.totalProjects ?? 0} />
-        <Card title="Total Tasks" value={kpis?.totalTasks ?? 0} />
-        <Card title="Completed" value={kpis?.completedTasks ?? 0} tone="success" />
-        <Card title="Pending" value={kpis?.pendingTasks ?? 0} tone="warning" />
-        <Card title="Overdue" value={kpis?.overdueTasks ?? 0} tone="danger" />
-      </div>
-      <div className="dashboardGrid">
+      {kpisLoading ? (
+        <SkeletonKpis />
+      ) : (
+        <div className="kpiRow">
+          <Card title="Total Projects" value={kpis?.totalProjects ?? 0} />
+          <Card title="Total Tasks" value={kpis?.totalTasks ?? 0} />
+          <Card title="Completed" value={kpis?.completedTasks ?? 0} tone="success" />
+          <Card title="Pending" value={kpis?.pendingTasks ?? 0} tone="warning" />
+          <Card title="Overdue" value={kpis?.overdueTasks ?? 0} tone="danger" />
+        </div>
+      )}
+      {analyticsLoading ? <SkeletonPanels count={6} /> : null}
+      <div className="dashboardGrid" style={analyticsLoading ? { display: "none" } : undefined}>
         <ChartPanel title="Tasks By Priority" isEmpty={!tasksByPriority.length}>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={tasksByPriority}>
@@ -438,7 +448,7 @@ export const ProjectsPage = () => {
   const [projectError, setProjectError] = useState("");
   const qc = useQueryClient();
   const { data: users } = useQuery({ queryKey: ["project-users"], queryFn: async () => (await api.get("/users")).data });
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["projects", search, status, sort, page],
     queryFn: async () => (await api.get("/projects", { params: { search, status, sort, page, limit: 8 } })).data,
   });
@@ -499,7 +509,8 @@ export const ProjectsPage = () => {
           {projectError ? <p className="errorText">{projectError}</p> : null}
         </div>
       </RoleGate>
-      {(data?.items || []).length === 0 ? (
+      {isLoading ? <SkeletonCards count={4} /> : null}
+      {!isLoading && (data?.items || []).length === 0 ? (
         <EmptyState title="No projects yet" description="Projects you create or belong to will appear here." />
       ) : null}
       <div className="entityList">
@@ -657,7 +668,7 @@ export const TasksPage = () => {
     queryKey: ["project-select"],
     queryFn: async () => (await api.get("/projects", { params: { limit: 100 } })).data,
   });
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["tasks", params],
     queryFn: async () => (await api.get("/tasks", { params: { ...params, limit: 10 } })).data,
   });
@@ -833,7 +844,8 @@ export const TasksPage = () => {
           </div>
         </div>
       </RoleGate>
-      {(data?.items || []).length === 0 ? (
+      {isLoading ? <SkeletonCards count={5} /> : null}
+      {!isLoading && (data?.items || []).length === 0 ? (
         <EmptyState title="No tasks found" description="Adjust your filters, or create a task to get started." />
       ) : null}
       <div className="entityList">
@@ -975,7 +987,7 @@ export const TasksPage = () => {
 export const TeamPage = () => {
   const [memberQuery, setMemberQuery] = useState("");
   const [selectedMemberId, setSelectedMemberId] = useState("");
-  const { data: users } = useQuery({
+  const { data: users, isLoading: usersLoading } = useQuery({
     queryKey: ["user-search", memberQuery],
     queryFn: async () => (await api.get("/users/search", { params: { q: memberQuery } })).data,
   });
@@ -1014,7 +1026,9 @@ export const TeamPage = () => {
             ))}
           </select>
         </div>
-        {(users || []).length ? (
+        {usersLoading ? (
+          <SkeletonMembers count={6} />
+        ) : (users || []).length ? (
           <div className="memberGrid">
             {(users || []).map((u: any) => (
               <MemberCard key={u._id} name={u.name} email={u.email} role={u.role} />
@@ -1064,7 +1078,7 @@ export const TeamPage = () => {
 
 export const NotificationsPage = () => {
   const qc = useQueryClient();
-  const { data: notifications } = useQuery({
+  const { data: notifications, isLoading } = useQuery({
     queryKey: ["notifications"],
     queryFn: async () => (await api.get("/collaboration/notifications")).data,
   });
@@ -1078,7 +1092,11 @@ export const NotificationsPage = () => {
     <>
       <PageHeader title="Notifications" subtitle="Stay updated on assignments and project changes." />
       <PageCard className="pageCard--flush">
-        {items.length ? (
+        {isLoading ? (
+          <div className="skelPad">
+            <SkeletonList count={6} />
+          </div>
+        ) : items.length ? (
           <div className="notificationList">
             {items.map((n: any) => (
               <NotificationItem

@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { setToken } from "./api";
 import { ProtectedRoute, ShellNav, roleLabel } from "./components";
 import { DashboardPage, LoginPage, NotificationsPage, ProjectsPage, SignupPage, TasksPage, TeamPage } from "./pages";
@@ -25,10 +25,32 @@ const ThemeToggle = () => {
 const Shell = () => {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const [navOpen, setNavOpen] = useState(false);
+  const closeNav = () => setNavOpen(false);
 
   return (
     <div className="appShell">
-      <aside className="sidebar">
+      <header className="mobileTopBar">
+        <button
+          type="button"
+          className="hamburger"
+          aria-label="Open menu"
+          aria-expanded={navOpen ? "true" : "false"}
+          onClick={() => setNavOpen((v) => !v)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+        <div className="mobileBrand">
+          <div className="brandLogo brandLogo--sm">TF</div>
+          <span className="brandMark">TaskForge</span>
+        </div>
+      </header>
+
+      {navOpen ? <div className="navOverlay" onClick={closeNav} aria-hidden /> : null}
+
+      <aside className={`sidebar${navOpen ? " sidebar--open" : ""}`}>
         <div className="sidebarHeader">
           <div className="brand">
             <div className="brandLogo">TF</div>
@@ -47,7 +69,7 @@ const Shell = () => {
           </div>
         </div>
         <div className="sidebarBody">
-          <ShellNav />
+          <ShellNav onNavigate={closeNav} />
           <ThemeToggle />
           <button type="button" className="btnSignOut" onClick={logout}>
             Sign out

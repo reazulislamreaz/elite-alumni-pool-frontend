@@ -186,7 +186,7 @@ const NAV_ITEMS = [
   { to: "/notifications", label: "Notifications", icon: "notifications" },
 ];
 
-export const ShellNav = () => {
+export const ShellNav = ({ onNavigate }: { onNavigate?: () => void }) => {
   const { data: notifications } = useQuery({
     queryKey: ["notifications"],
     queryFn: async () => (await api.get("/collaboration/notifications")).data,
@@ -200,6 +200,7 @@ export const ShellNav = () => {
           key={item.to}
           to={item.to}
           end={item.to === "/"}
+          onClick={onNavigate}
           className={({ isActive }) => `navItem${isActive ? " navItem--active" : ""}`}
         >
           <NavIcon name={item.icon} />
@@ -234,3 +235,78 @@ export const TaskProgress = ({ status }: { status: string }) => {
     </div>
   );
 };
+
+/* ---------- Skeleton loaders (shown while data is fetching) ---------- */
+
+const range = (n: number) => Array.from({ length: n }, (_, i) => i);
+
+export const Skeleton = ({ w, h, r }: { w?: string; h?: string; r?: string }) => (
+  <span className="skeleton" style={{ width: w, height: h, borderRadius: r }} aria-hidden />
+);
+
+export const SkeletonKpis = () => (
+  <div className="kpiRow" aria-hidden>
+    {range(5).map((i) => (
+      <div key={i} className="kpiCard">
+        <Skeleton w="55%" h="11px" />
+        <Skeleton w="40%" h="26px" r="6px" />
+      </div>
+    ))}
+  </div>
+);
+
+export const SkeletonCards = ({ count = 4 }: { count?: number }) => (
+  <div className="entityList" aria-hidden>
+    {range(count).map((i) => (
+      <div key={i} className="entityCard skeletonCard">
+        <div className="skelBetween">
+          <Skeleton w="38%" h="17px" />
+          <Skeleton w="64px" h="18px" r="999px" />
+        </div>
+        <Skeleton w="72%" h="12px" />
+        <div className="skelRow">
+          <Skeleton w="90px" h="12px" />
+          <Skeleton w="110px" h="12px" />
+          <Skeleton w="80px" h="12px" />
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+export const SkeletonPanels = ({ count = 4 }: { count?: number }) => (
+  <div className="dashboardGrid" aria-hidden>
+    {range(count).map((i) => (
+      <div key={i} className="panel skeletonCard">
+        <Skeleton w="45%" h="14px" />
+        <Skeleton w="100%" h="180px" r="10px" />
+      </div>
+    ))}
+  </div>
+);
+
+export const SkeletonList = ({ count = 5 }: { count?: number }) => (
+  <div className="skeletonList" aria-hidden>
+    {range(count).map((i) => (
+      <div key={i} className="skelListRow">
+        <Skeleton w="60%" h="13px" />
+        <Skeleton w="20%" h="11px" />
+      </div>
+    ))}
+  </div>
+);
+
+export const SkeletonMembers = ({ count = 6 }: { count?: number }) => (
+  <div className="memberGrid" aria-hidden>
+    {range(count).map((i) => (
+      <div key={i} className="memberCard skeletonCard">
+        <Skeleton w="44px" h="44px" r="50%" />
+        <div className="skelMemberBody">
+          <Skeleton w="70%" h="13px" />
+          <Skeleton w="90%" h="11px" />
+          <Skeleton w="50%" h="16px" r="999px" />
+        </div>
+      </div>
+    ))}
+  </div>
+);

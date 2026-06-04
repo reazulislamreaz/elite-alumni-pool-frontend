@@ -1,3 +1,4 @@
+
 :root {
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 
@@ -1207,9 +1208,27 @@ button:disabled {
   .appShell {
     grid-template-columns: 1fr;
   }
+  .mobileTopBar {
+    display: flex;
+  }
+  .navOverlay {
+    display: block;
+  }
   .sidebar {
-    position: relative;
-    height: auto;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 280px;
+    max-width: 85vw;
+    z-index: 50;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: var(--shadow-md);
+  }
+  .sidebar--open {
+    transform: translateX(0);
   }
   .kpiRow {
     grid-template-columns: repeat(2, 1fr);
@@ -1236,6 +1255,24 @@ button:disabled {
 @media (max-width: 520px) {
   .kpiRow {
     grid-template-columns: 1fr;
+  }
+  .toolbar input,
+  .toolbar select {
+    max-width: none;
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+  .mainArea {
+    padding: var(--space-3);
+  }
+  .pageCard {
+    padding: var(--space-4);
+  }
+  .cardActions {
+    gap: var(--space-2);
+  }
+  .cardActionsSpacer {
+    display: none;
   }
 }
 
@@ -1513,4 +1550,132 @@ button:disabled {
     flex-direction: row;
     align-items: center;
   }
+}
+
+/* ============================================================
+   Skeleton loaders
+   ============================================================ */
+
+.skeleton {
+  display: block;
+  height: 14px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--bg-muted) 25%, var(--border) 37%, var(--bg-muted) 63%);
+  background-size: 400% 100%;
+  animation: skeletonShimmer 1.4s ease infinite;
+}
+@keyframes skeletonShimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+.skeletonCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.skeletonCard:hover {
+  transform: none;
+  box-shadow: var(--shadow-sm);
+  border-color: var(--border);
+}
+.skelBetween {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.skelBetween .skeleton {
+  flex-shrink: 0;
+}
+.skelRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+.skeletonList {
+  display: flex;
+  flex-direction: column;
+}
+.skelListRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+.skelMemberBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
+}
+.skelPad {
+  padding: var(--space-4) var(--space-5);
+}
+
+/* ============================================================
+   Responsive: mobile top bar + slide-in sidebar drawer
+   ============================================================ */
+
+.mobileTopBar {
+  display: none;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--primary-dark);
+  color: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+.mobileBrand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.mobileBrand .brandMark {
+  font-size: 1rem;
+}
+.brandLogo--sm {
+  width: 32px;
+  height: 32px;
+  font-size: 0.72rem;
+  border-radius: var(--radius-md);
+}
+.hamburger {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 38px;
+  height: 38px;
+  padding: 9px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+.hamburger span {
+  display: block;
+  height: 2px;
+  width: 100%;
+  background: #fff;
+  border-radius: 2px;
+}
+.navOverlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 40;
 }
